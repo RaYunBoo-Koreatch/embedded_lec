@@ -9,6 +9,7 @@ import traceback
 
 speed = 80
 epsilon = 0.0001
+dnn_lastperfcounter = 0
 
 def func_thread():
     i = 0
@@ -23,6 +24,7 @@ def collision_detect_thread():
     global frame
     global lock_frame
     global collision
+    global dnn_lastperfcounter
     
     class_names = []
     with open('object_detection_classes_coco.txt', 'r') as f:
@@ -54,16 +56,9 @@ def collision_detect_thread():
         dnnframe = frame.copy()
         lock_frame.release()
         
-        ##
-        cputime1 = time.perf_counter()
-        
         blob = cv.dnn.blobFromImage(image=dnnframe, size=(300,300), swapRB=True)
         dnnModel.setInput(blob)
         output = dnnModel.forward()
-        
-        ##
-        cputime2 = time.perf_counter()
-        print('dnn time :', 1/(cputime2-cputime1), 'fps')
         
         detected_counter = 0
         detected = []
@@ -96,6 +91,11 @@ def collision_detect_thread():
         print('detected', detected)
         cv.imshow('collision', dnnframe)
         
+        dnn_perfcounter = time.perf_counter()
+        dnn_cputime = dnn_perfcounter - dnn_lastperfcounter 
+        print("dnn time : %5d ms ( %5.2f fps )" % (dnn_cputime*1000, 1/dnn_cputime))
+        dnn_lastperfcounter = dnn_perfcounter
+        
     
 
 def key_cmd(which_key):
@@ -103,6 +103,7 @@ def key_cmd(which_key):
     is_exit = False 
     global enable_AIdrive # assignment가 있는 경우는 global 키워드로 표시
     global enable_Collision
+    global dnn_lastperfcounter
     
     if which_key & 0xFF == 184:
         print('up')
@@ -137,6 +138,7 @@ def key_cmd(which_key):
         print('enable_AIdrive: ', enable_AIdrive)    
              
     elif which_key & 0xFF == ord('d'):  
+        dnn_lastperfcounter = time.perf_counter()
         enable_Collision = True
         print('enable_Collision: ', enable_Collision)        
     elif which_key & 0xFF == ord('s'):  
@@ -236,8 +238,8 @@ def drive_AI(img):
             if not lastcollision:
                 print("collision stop!")
             car.motor_stop()
+            lastcollision = collision
             return
-            
         lastcollision = collision
     
     #print('id', id(model))
